@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Familiar Journeys - AI Care Platform</title>
+    <style>
+      body, html { height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; }
+      
+      .screen { display: none; height: 100%; width: 100%; position: absolute; top: 0; left: 0; overflow-y: auto; }
+      #welcome-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; background: #2c3e50; color: white; }
+      #patient-screen { background: #000; overflow: hidden; }
+      .dashboard-screen { background: #f0f2f5; padding: 40px; box-sizing: border-box; }
+
+      .btn-primary { font-size: 28px; padding: 20px 40px; background: #27ae60; color: white; border: none; border-radius: 12px; cursor: pointer; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+      .btn-secondary { font-size: 14px; padding: 8px 16px; background: transparent; color: #bdc3c7; border: 1px solid #bdc3c7; border-radius: 8px; cursor: pointer; }
+      .btn-secondary:hover { background: rgba(0,0,0,0.05); }
+      
+      .portal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+      .card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+      .form-group { margin-bottom: 15px; }
+      .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #34495e; font-size: 14px;}
+      .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; font-family: inherit; }
+      .form-group textarea { resize: vertical; min-height: 80px; }
+      .btn-action { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;}
+      
+      .list-item { border: 1px solid #dfe6e9; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: #fafafa; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #3498db; }
+      .list-item-left { display: flex; align-items: center; gap: 15px; }
+      .item-info h4 { margin: 0 0 5px 0; color: #2c3e50; font-size: 18px; }
+      .badge { display: inline-block; background: #e8f4f8; color: #2980b9; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+      .item-details { margin: 0; font-size: 13px; color: #7f8c8d; }
+
+      .reorder-controls { display: flex; flex-direction: column; gap: 4px; }
+      .btn-reorder { background: #e0e0e0; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #333; font-size: 10px; }
+      .btn-reorder:hover:not(:disabled) { background: #bdc3c7; }
+      .btn-reorder:disabled { opacity: 0.3; cursor: not-allowed; }
+
+      .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 100; }
+      .modal-box { background: white; padding: 30px; border-radius: 12px; width: 450px; max-width: 90%; color: black; }
+      
+      #street-view-container { height: 100%; width: 100%; }
+      #fade-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; opacity: 0; transition: opacity 2s ease-in-out; pointer-events: none; z-index: 5; }
+      .sched-field { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; }
+      
+      #welcome-patient-select { font-size: 18px; padding: 10px 20px; border-radius: 8px; margin-bottom: 30px; background: rgba(255,255,255,0.1); color: white; border: 1px solid white; cursor: pointer; }
+      #welcome-patient-select option { color: black; }
+
+      /* AI Assistant Styles */
+      .ai-box { border: 2px dashed #9b59b6; background: #fdfafr; border-radius: 8px; padding: 20px; margin-top: 20px; }
+      .ai-header { display: flex; align-items: center; color: #8e44ad; margin-bottom: 15px; }
+      .ai-header h3 { margin: 0; font-size: 18px; }
+      .ai-suggestion-group { margin-bottom: 15px; }
+      .ai-suggestion-group h4 { margin: 0 0 5px 0; font-size: 14px; color: #333; }
+      .ai-suggestion-group ul { margin: 0; padding-left: 20px; font-size: 13px; color: #555; }
+      .ai-loading { display: none; color: #8e44ad; font-weight: bold; font-style: italic; }
+    </style>
+  </head>
+  <body>
+    <!-- 1. WELCOME SCREEN -->
+    <div id="welcome-screen" class="screen">
+      <h1 style="font-size: 48px; margin-bottom: 20px;">Familiar Journeys</h1>
+      <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">
+        <label style="margin-bottom: 10px; font-size: 14px; opacity: 0.8;">Select Patient Profile:</label>
+        <select id="welcome-patient-select"></select>
+      </div>
+      <button class="btn-primary" onclick="startPatientExperience()">Start the Journey</button>
+      <button class="btn-secondary" onclick="showModal('pin-modal')">Caregiver Access</button>
+    </div>
+
+    <!-- PIN MODAL -->
+    <div id="pin-modal" class="modal-overlay">
+      <div class="modal-box" style="text-align: center; width: 300px;">
+        <h3>Enter Caregiver PIN</h3>
+        <input type="password" id="pin-input" maxlength="4" style="font-size: 24px; letter-spacing: 5px; text-align: center; width: 150px; margin: 0 auto 15px auto; display: block;">
+        <button class="btn-action" onclick="verifyPin()">Unlock</button>
+        <button class="btn-secondary" style="color: black; border-color: #ccc; margin-left: 10px;" onclick="closeModal('pin-modal')">Cancel</button>
+      </div>
+    </div>
+
+    <!-- PATIENT MODAL (For Name Only) -->
+    <div id="patient-modal" class="modal-overlay">
+      <div class="modal-box">
+        <h3 id="patient-modal-title" style="margin-top:0;">Add New Patient</h3>
+        <input type="hidden" id="edit-patient-index"> 
+        <div class="form-group"><label>Patient Name</label><input type="text" id="p-name" placeholder="e.g., Mary Smith"></div>
+        <div style="display: flex; justify-content: space-between; margin-top: 25px;">
+          <button class="btn-secondary" style="color: black; border-color: #ccc;" onclick="closeModal('patient-modal')">Cancel</button>
+          <button class="btn-action" onclick="savePatient()">Save Patient</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOURNEY SCHEDULE MODAL -->
+    <div id="journey-modal" class="modal-overlay">
+      <div class="modal-box">
+        <h3 id="journey-modal-title" style="margin-top:0;">Journey Settings</h3>
+        <input type="hidden" id="edit-journey-index"> 
+        <div class="form-group"><label>Journey Name</label><input type="text" id="j-name"></div>
+        <div class="form-group">
+          <label>Schedule Type</label>
+          <select id="j-type" onchange="toggleScheduleFields()">
+            <option value="none">Manual / Default (Always Available)</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly (Day of the Year)</option>
+            <option value="specific">Specific Date</option>
+          </select>
+        </div>
+        <div id="field-time" class="form-group sched-field"><label>Time</label><input type="time" id="j-time" value="09:00"></div>
+        <div id="field-weekly" class="form-group sched-field"><label>Day of the Week</label><select id="j-weekday"><option value="0">Sun</option><option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option><option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option></select></div>
+        <div id="field-monthly" class="form-group sched-field"><label>Day of the Month (1-31)</label><input type="number" id="j-monthday" min="1" max="31" value="1"></div>
+        <div id="field-yearly" class="form-group sched-field"><label>Month and Day</label><div style="display:flex; gap:10px;"><select id="j-yearmonth"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select><input type="number" id="j-yearday" min="1" max="31" value="1"></div></div>
+        <div id="field-specific" class="form-group sched-field"><label>Exact Date</label><input type="date" id="j-specificdate"></div>
+        <div style="display: flex; justify-content: space-between; margin-top: 25px;">
+          <button class="btn-secondary" style="color: black; border-color: #ccc;" onclick="closeModal('journey-modal')">Cancel</button>
+          <button class="btn-action" onclick="saveJourney()">Save Schedule</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STOP MODAL -->
+    <div id="stop-modal" class="modal-overlay">
+      <div class="modal-box">
+        <h3 id="stop-modal-title" style="margin-top:0;">Edit Memory Stop</h3>
+        <input type="hidden" id="edit-stop-index"> 
+        <div class="form-group"><label>Location Name</label><input type="text" id="s-name"></div>
+        <div class="form-group"><label>Photo File Name</label><input type="text" id="s-photo"></div>
+        <div class="form-group"><label>Audio File Name (Optional)</label><input type="text" id="s-audio"></div>
+        <div class="form-group"><label>Trigger Angle (Degrees: 0-360)</label><input type="number" id="s-angle" min="0" max="360"></div>
+        <div style="display: flex; justify-content: space-between; margin-top: 25px;">
+          <button class="btn-secondary" style="color: black; border-color: #ccc;" onclick="closeModal('stop-modal')">Cancel</button>
+          <button class="btn-action" onclick="saveStop()">Save Memory</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2A. CAREGIVER DASHBOARD (Patient List) -->
+    <div id="patients-screen" class="screen dashboard-screen">
+      <div class="portal-header">
+        <h2>Caregiver Platform: Patients</h2>
+        <button class="btn-secondary" style="color: #c0392b; border-color: #c0392b;" onclick="showScreen('welcome-screen')">Logout</button>
+      </div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h3 style="margin: 0;">Patient Profiles</h3>
+          <button class="btn-action" style="background: #27ae60;" onclick="openPatientModal()">+ Add New Patient</button>
+        </div>
+        <div id="patients-list"></div>
+      </div>
+    </div>
+
+    <!-- 2B. PATIENT PROFILE SCREEN (With AI Module) -->
+    <div id="profile-screen" class="screen dashboard-screen">
+      <div class="portal-header">
+        <h2>Critical Profile: <span id="profile-patient-name" style="color:#2980b9;"></span></h2>
+        <button class="btn-secondary" style="color: #333; border-color: #333;" onclick="showScreen('patients-screen')">&larr; Back to Patients</button>
+      </div>
+      
+      <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 20px;">Save this data to allow the AI Care Module to generate tailored reminiscence therapy recommendations.</p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="card" style="margin-bottom: 0;">
+          <h3 style="margin-top: 0; color: #34495e;">Personal History</h3>
+          <div class="form-group"><label>Birth Year</label><input type="number" id="prof-birthyear" placeholder="e.g., 1945"></div>
+          <div class="form-group"><label>Hometown</label><input type="text" id="prof-hometown" placeholder="e.g., Kraków, Poland"></div>
+          <div class="form-group"><label>Former Occupation</label><input type="text" id="prof-occupation" placeholder="e.g., Engineer"></div>
+          <div class="form-group"><label>Hobbies & Passions</label><textarea id="prof-hobbies" placeholder="e.g., Classical music, gardening"></textarea></div>
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+          <h3 style="margin-top: 0; color: #e67e22;">Cognitive Needs</h3>
+          <div class="form-group">
+            <label>Dementia Stage</label>
+            <select id="prof-stage">
+              <option value="early">Early Stage (Mild)</option>
+              <option value="moderate">Moderate Stage</option>
+              <option value="advanced">Advanced Stage (Severe)</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Sensory Impairments</label><input type="text" id="prof-sensory" placeholder="e.g., Slight hearing loss"></div>
+          <div class="form-group"><label>Known Triggers</label><textarea id="prof-triggers" placeholder="e.g., Loud noises, fast movement"></textarea></div>
+          <div class="form-group"><label>Doctor's Notes</label><textarea id="prof-notes" placeholder="Clinical notes..."></textarea></div>
+        </div>
+      </div>
+
+      <div style="text-align: right; margin-top: 20px;">
+        <button class="btn-action" style="background: #27ae60; padding: 12px 30px;" onclick="saveProfile()">Save Critical Profile</button>
+      </div>
+
+      <!-- AI Care Assistant Module -->
+      <div class="ai-box">
+        <div class="ai-header">
+          <h3>✨ AI Care Assistant</h3>
+          <button class="btn-action" style="background: #9b59b6; margin-left: auto;" onclick="triggerAI()">Generate Recommendations</button>
+        </div>
+        <p style="font-size: 13px; color: #555; margin-top: 0;">Uses the patient's birth year and hometown to calculate their "Reminiscence Bump" (ages 15-25) and suggests appropriate media.</p>
+        
+        <div id="ai-loading" class="ai-loading">Analyzing profile and generating therapeutic suggestions...</div>
+        
+        <div id="ai-results" style="display: none; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 20px;">
+          <div class="ai-suggestion-group">
+            <h4>📷 Suggested Photo Journeys</h4>
+            <ul id="ai-photos"></ul>
+          </div>
+          <div class="ai-suggestion-group">
+            <h4>🎵 Suggested Era Music</h4>
+            <ul id="ai-music"></ul>
+          </div>
+          <div class="ai-suggestion-group">
+            <h4>⚕️ Clinical UI Adjustment</h4>
+            <p id="ai-clinical" style="margin:0; font-size: 13px; color: #c0392b; font-weight: bold;"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2C. JOURNEYS SUB-SCREEN -->
+    <div id="journeys-screen" class="screen dashboard-screen">
+      <div class="portal-header">
+        <h2>Journeys for: <span id="managing-journey-patient" style="color:#2980b9;"></span></h2>
+        <button class="btn-secondary" style="color: #333; border-color: #333;" onclick="showScreen('patients-screen')">&larr; Back to Patients</button>
+      </div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h3 style="margin: 0;">Scheduled Journeys</h3>
+          <button class="btn-action" style="background: #27ae60;" onclick="openJourneyModal()">+ Create New Journey</button>
+        </div>
+        <div id="journeys-list"></div>
+      </div>
+    </div>
+
+    <!-- 2D. MANAGE STOPS SUB-SCREEN -->
+    <div id="stops-screen" class="screen dashboard-screen">
+      <div class="portal-header">
+        <h2>Memory Stops: <span id="managing-journey-name" style="color:#2980b9;"></span></h2>
+        <button class="btn-secondary" style="color: #333; border-color: #333;" onclick="showScreen('journeys-screen')">&larr; Back to Journeys</button>
+      </div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h3 style="margin: 0;">Memory Stops</h3>
+          <button class="btn-action" style="background: #27ae60;" onclick="openStopModal()">+ Add New Stop</button>
+        </div>
+        <div id="stops-list"></div>
+      </div>
+    </div>
+
+    <!-- 3. PATIENT EXPERIENCE -->
+    <div id="patient-screen" class="screen">
+      <audio id="memory-audio"></audio>
+      <div id="fade-overlay"></div>
+      <div id="street-view-container"></div>
+    </div>
+
+    <script>
+      // --- DATA ARCHITECTURE --- //
+      // Removed the soothing factors property to match the new UI layout
+      let patients = [
+        {
+          id: 'p_1',
+          name: 'Mary Smith',
+          profile: { birthYear: '1942', hometown: 'Auckland, NZ', occupation: 'Teacher', hobbies: 'Gardening, baking', stage: 'early', sensory: '', triggers: '', notes: '' },
+          journeys: [
+            { 
+              id: 'j_default', name: 'The Classics (Default)', schedule: { type: 'none' },
+              stops: [{ id: 's1', name: 'Childhood Home', photo: 'Photos/Image_0001.jpg', audio: 'Sounds/question_0001.mp3', triggerAngle: 90 }]
+            }
+          ]
+        }
+      ];
+
+      let editingPatientIndex = -1; 
+      let editingJourneyIndex = -1; 
+
+      // --- UI NAVIGATION --- //
+      function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(el => el.style.display = 'none');
+        document.getElementById(screenId).style.display = 'block';
+        closeModal('pin-modal');
+        if(screenId === 'welcome-screen') updateWelcomeDropdown();
+        if(screenId === 'patients-screen') renderPatients();
+        if(screenId === 'journeys-screen') renderJourneys();
+        if(screenId === 'stops-screen') renderStops();
+      }
+      function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+      function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+      function verifyPin() {
+        if (document.getElementById('pin-input').value === '1234') showScreen('patients-screen');
+        else alert('Incorrect PIN');
+      }
+      function updateWelcomeDropdown() {
+        const select = document.getElementById('welcome-patient-select');
+        select.innerHTML = '';
+        patients.forEach((p, index) => { select.innerHTML += `<option value="${index}">${p.name}</option>`; });
+      }
+
+      // --- LEVEL 1: PATIENT MANAGEMENT --- //
+      function renderPatients() {
+        const container = document.getElementById('patients-list');
+        container.innerHTML = '';
+        patients.forEach((p, index) => {
+          container.innerHTML += `
+            <div class="list-item">
+              <div>
+                <div class="item-info"><h4>${p.name}</h4></div>
+                <p class="item-details">${p.journeys.length} configured journeys</p>
+              </div>
+              <div style="display:flex; gap:10px;">
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                  <button class="btn-secondary" style="color:#8e44ad; border-color:#8e44ad; width: 140px;" onclick="manageProfile(${index})">Patient Profile</button>
+                  <button class="btn-secondary" style="color:#27ae60; border-color:#27ae60; width: 140px;" onclick="manageJourneys(${index})">Manage Journeys</button>
+                </div>
+                <div style="display:flex; flex-direction:column; justify-content: center;">
+                  <button class="btn-secondary" style="color:#e74c3c; border-color:#e74c3c;" onclick="deletePatient(${index})">Delete</button>
+                </div>
+              </div>
+            </div>`;
+        });
+      }
+
+      function openPatientModal(index = -1) {
+        document.getElementById('edit-patient-index').value = index === -1 ? '' : index;
+        document.getElementById('p-name').value = index === -1 ? '' : patients[index].name;
+        showModal('patient-modal');
+      }
+
+      function savePatient() {
+        const indexStr = document.getElementById('edit-patient-index').value;
+        const name = document.getElementById('p-name').value;
+        if (indexStr === '') {
+          patients.push({ id: 'p_' + Date.now(), name: name, profile: { birthYear: '', hometown: '', occupation: '', hobbies: '', stage: 'early', sensory: '', triggers: '', notes: '' }, journeys: [] });
+        } else {
+          patients[parseInt(indexStr)].name = name;
+        }
+        closeModal('patient-modal');
+        renderPatients();
+      }
+
+      function deletePatient(index) {
+        if(confirm("Are you sure?")) { patients.splice(index, 1); renderPatients(); }
+      }
+
+      // --- LEVEL 1.5: PATIENT PROFILE & MOCK AI (Bug Fixed) --- //
+      function manageProfile(index) {
+        editingPatientIndex = index;
+        const p = patients[index];
+        document.getElementById('profile-patient-name').innerText = p.name;
+        
+        // This is where the bug was! It is fixed now.
+        document.getElementById('prof-birthyear').value = p.profile.birthYear || '';
+        document.getElementById('prof-hometown').value = p.profile.hometown || '';
+        document.getElementById('prof-occupation').value = p.profile.occupation || '';
+        document.getElementById('prof-hobbies').value = p.profile.hobbies || '';
+        document.getElementById('prof-stage').value = p.profile.stage || 'early';
+        document.getElementById('prof-sensory').value = p.profile.sensory || '';
+        document.getElementById('prof-triggers').value = p.profile.triggers || '';
+        document.getElementById('prof-notes').value = p.profile.notes || '';
+        
+        // Hide AI results when loading a new profile
+        document.getElementById('ai-results').style.display = 'none';
+        
+        showScreen('profile-screen');
+      }
+
+      function saveProfile() {
+        // Also removed the bug from the save function
+        patients[editingPatientIndex].profile = {
+          birthYear: document.getElementById('prof-birthyear').value,
+          hometown: document.getElementById('prof-hometown').value,
+          occupation: document.getElementById('prof-occupation').value,
+          hobbies: document.getElementById('prof-hobbies').value,
+          stage: document.getElementById('prof-stage').value,
+          sensory: document.getElementById('prof-sensory').value,
+          triggers: document.getElementById('prof-triggers').value,
+          notes: document.getElementById('prof-notes').value
+        };
+        alert("Patient Critical Profile saved successfully.");
+      }
+
+      // THE AI SIMULATION FUNCTION
+      function triggerAI() {
+        const birthYear = parseInt(document.getElementById('prof-birthyear').value);
+        const hometown = document.getElementById('prof-hometown').value || 'their hometown';
+        const stage = document.getElementById('prof-stage').value;
+        const triggers = document.getElementById('prof-triggers').value;
+
+        if (!birthYear) {
+            alert("The AI requires a Birth Year to calculate the reminiscence bump.");
+            return;
+        }
+
+        document.getElementById('ai-loading').style.display = 'block';
+        document.getElementById('ai-results').style.display = 'none';
+
+        setTimeout(() => {
+            const memoryDecadeStart = birthYear + 15;
+            const memoryDecadeEnd = birthYear + 25;
+
+            document.getElementById('ai-photos').innerHTML = `
+                <li>Main streets of ${hometown} circa ${memoryDecadeStart}</li>
+                <li>Popular local parks or cinemas in ${hometown} during the ${String(memoryDecadeStart).substring(0,3)}0s</li>
+                <li>Vintage interior of a school or university classroom from ${memoryDecadeEnd}</li>
+            `;
+
+            let musicList = "";
+            if (memoryDecadeStart < 1950) musicList = "<li>Glenn Miller - In The Mood</li><li>Bing Crosby Hits</li>";
+            else if (memoryDecadeStart < 1960) musicList = "<li>Elvis Presley - Love Me Tender</li><li>Chuck Berry - Johnny B. Goode</li>";
+            else if (memoryDecadeStart < 1970) musicList = "<li>The Beatles - Hey Jude</li><li>Aretha Franklin - Respect</li>";
+            else musicList = `<li>Top Billboard hits from ${memoryDecadeStart} to ${memoryDecadeEnd}</li>`;
+            document.getElementById('ai-music').innerHTML = musicList;
+
+            let clinicalText = "Standard panning speed and audio prompts are recommended.";
+            if (stage === 'moderate') clinicalText = "Reduce panning speed slightly. Ensure audio prompts use simple, direct questions.";
+            if (stage === 'advanced') clinicalText = "CRITICAL OVERRIDE: App will automatically disable audio triggers and restrict panning speed to very slow to prevent disorientation.";
+            if (triggers) clinicalText += ` Avoid imagery containing: ${triggers}.`;
+            
+            document.getElementById('ai-clinical').innerText = clinicalText;
+            document.getElementById('ai-loading').style.display = 'none';
+            document.getElementById('ai-results').style.display = 'block';
+        }, 1200); 
+      }
+
+      // --- LEVEL 2: JOURNEY MANAGEMENT --- //
+      function manageJourneys(index) {
+        editingPatientIndex = index;
+        document.getElementById('managing-journey-patient').innerText = patients[index].name;
+        showScreen('journeys-screen');
+      }
+      function toggleScheduleFields() { 
+        document.querySelectorAll('.sched-field').forEach(el => el.style.display = 'none');
+        const type = document.getElementById('j-type').value;
+        if (type !== 'none') document.getElementById('field-time').style.display = 'block';
+        if (type === 'weekly') document.getElementById('field-weekly').style.display = 'block';
+        if (type === 'monthly') document.getElementById('field-monthly').style.display = 'block';
+        if (type === 'yearly') document.getElementById('field-yearly').style.display = 'block';
+        if (type === 'specific') document.getElementById('field-specific').style.display = 'block';
+      }
+      function renderJourneys() {
+        const container = document.getElementById('journeys-list');
+        container.innerHTML = '';
+        patients[editingPatientIndex].journeys.forEach((j, index) => {
+          let schedText = "Always Available (Default)";
+          if (j.schedule.type === 'daily') schedText = `Daily at ${j.schedule.time}`;
+          if (j.schedule.type === 'weekly') schedText = `Weekly (Day ${j.schedule.detail}) at ${j.schedule.time}`;
+          if (j.schedule.type === 'monthly') schedText = `Monthly (Day ${j.schedule.detail}) at ${j.schedule.time}`;
+          if (j.schedule.type === 'yearly') schedText = `Yearly on ${j.schedule.detail} at ${j.schedule.time}`;
+          if (j.schedule.type === 'specific') schedText = `Once on ${j.schedule.detail} at ${j.schedule.time}`;
+          container.innerHTML += `
+            <div class="list-item">
+              <div><div class="badge">${schedText}</div><div class="item-info"><h4>${j.name}</h4></div><p class="item-details">${j.stops.length} Memory Stops</p></div>
+              <div style="display:flex; flex-direction:column; gap:5px;">
+                <button class="btn-secondary" style="color:#27ae60; border-color:#27ae60;" onclick="manageStops(${index})">Manage Stops</button>
+                <div style="display:flex; gap:5px;"><button class="btn-secondary" style="color:#3498db; border-color:#3498db; flex:1;" onclick="openJourneyModal(${index})">Edit</button><button class="btn-secondary" style="color:#e74c3c; border-color:#e74c3c; flex:1;" onclick="deleteJourney(${index})">Delete</button></div>
+              </div>
+            </div>`;
+        });
+      }
+      function openJourneyModal(index = -1) { 
+        document.getElementById('edit-journey-index').value = index === -1 ? '' : index;
+        document.getElementById('journey-modal-title').innerText = index === -1 ? 'Create New Journey' : 'Edit Schedule';
+        if (index !== -1) {
+          const j = patients[editingPatientIndex].journeys[index];
+          document.getElementById('j-name').value = j.name;
+          document.getElementById('j-type').value = j.schedule.type;
+          if (j.schedule.time) document.getElementById('j-time').value = j.schedule.time;
+          if (j.schedule.type === 'weekly') document.getElementById('j-weekday').value = j.schedule.detail;
+          if (j.schedule.type === 'monthly') document.getElementById('j-monthday').value = j.schedule.detail;
+          if (j.schedule.type === 'yearly') { let parts = j.schedule.detail.split('-'); document.getElementById('j-yearmonth').value = parts[0]; document.getElementById('j-yearday').value = parts[1]; }
+          if (j.schedule.type === 'specific') document.getElementById('j-specificdate').value = j.schedule.detail;
+        } else { document.getElementById('j-name').value = ''; document.getElementById('j-type').value = 'none'; }
+        toggleScheduleFields();
+        showModal('journey-modal');
+      }
+      function saveJourney() { 
+        const indexStr = document.getElementById('edit-journey-index').value;
+        const type = document.getElementById('j-type').value;
+        let newSchedule = { type: type };
+        if (type !== 'none') newSchedule.time = document.getElementById('j-time').value;
+        if (type === 'weekly') newSchedule.detail = document.getElementById('j-weekday').value;
+        if (type === 'monthly') newSchedule.detail = document.getElementById('j-monthday').value;
+        if (type === 'yearly') newSchedule.detail = document.getElementById('j-yearmonth').value + '-' + document.getElementById('j-yearday').value;
+        if (type === 'specific') newSchedule.detail = document.getElementById('j-specificdate').value;
+        if (indexStr === '') { patients[editingPatientIndex].journeys.push({ id: 'j_' + Date.now(), name: document.getElementById('j-name').value || "New Journey", schedule: newSchedule, stops: [] }); } 
+        else { patients[editingPatientIndex].journeys[parseInt(indexStr)].name = document.getElementById('j-name').value; patients[editingPatientIndex].journeys[parseInt(indexStr)].schedule = newSchedule; }
+        closeModal('journey-modal'); renderJourneys();
+      }
+      function deleteJourney(index) { if(confirm("Delete this entire journey?")) { patients[editingPatientIndex].journeys.splice(index, 1); renderJourneys(); } }
+
+      // --- LEVEL 3: STOP MANAGEMENT --- //
+      function manageStops(journeyIndex) { editingJourneyIndex = journeyIndex; document.getElementById('managing-journey-name').innerText = patients[editingPatientIndex].journeys[journeyIndex].name; showScreen('stops-screen'); }
+      function renderStops() { 
+        const container = document.getElementById('stops-list'); container.innerHTML = '';
+        const currentStops = patients[editingPatientIndex].journeys[editingJourneyIndex].stops;
+        if (currentStops.length === 0) { container.innerHTML = "<p>No memory stops added yet. Click '+ Add New Stop' to begin.</p>"; return; }
+        currentStops.forEach((stop, index) => {
+          const isFirst = index === 0, isLast = index === currentStops.length - 1;
+          container.innerHTML += `
+            <div class="list-item">
+              <div class="list-item-left">
+                <div class="reorder-controls"><button class="btn-reorder" onclick="moveStop(${index}, -1)" ${isFirst ? 'disabled' : ''}>&#9650;</button><button class="btn-reorder" onclick="moveStop(${index}, 1)" ${isLast ? 'disabled' : ''}>&#9660;</button></div>
+                <div class="item-info"><h4>${index + 1}. ${stop.name}</h4><p class="item-details">Photo: ${stop.photo} | Audio: ${stop.audio || 'None'} | Angle: ${stop.triggerAngle}&deg;</p></div>
+              </div>
+              <div><button class="btn-secondary" style="color:#e74c3c; border-color:#e74c3c; margin-right:5px;" onclick="deleteStop(${index})">Delete</button><button class="btn-secondary" style="color:#3498db; border-color:#3498db;" onclick="openStopModal(${index})">Edit</button></div>
+            </div>`;
+        });
+      }
+      function moveStop(index, direction) { const stops = patients[editingPatientIndex].journeys[editingJourneyIndex].stops; const newIndex = index + direction; if (newIndex >= 0 && newIndex < stops.length) { const temp = stops[index]; stops[index] = stops[newIndex]; stops[newIndex] = temp; renderStops(); } }
+      function deleteStop(index) { if(confirm("Remove this memory stop?")) { patients[editingPatientIndex].journeys[editingJourneyIndex].stops.splice(index, 1); renderStops(); } }
+      function openStopModal(index = -1) { 
+        document.getElementById('edit-stop-index').value = index === -1 ? '' : index; document.getElementById('stop-modal-title').innerText = index === -1 ? 'Add New Stop' : 'Edit Stop';
+        if (index === -1) { document.getElementById('s-name').value = 'New Location'; document.getElementById('s-photo').value = 'Photos/'; document.getElementById('s-audio').value = 'Sounds/'; document.getElementById('s-angle').value = 90; } 
+        else { const stop = patients[editingPatientIndex].journeys[editingJourneyIndex].stops[index]; document.getElementById('s-name').value = stop.name; document.getElementById('s-photo').value = stop.photo; document.getElementById('s-audio').value = stop.audio; document.getElementById('s-angle').value = stop.triggerAngle; }
+        showModal('stop-modal');
+      }
+      function saveStop() { 
+        const indexStr = document.getElementById('edit-stop-index').value;
+        const newStop = { id: indexStr === '' ? 's_' + Date.now() : patients[editingPatientIndex].journeys[editingJourneyIndex].stops[parseInt(indexStr)].id, name: document.getElementById('s-name').value, photo: document.getElementById('s-photo').value, audio: document.getElementById('s-audio').value, triggerAngle: parseInt(document.getElementById('s-angle').value, 10) };
+        if (indexStr === '') patients[editingPatientIndex].journeys[editingJourneyIndex].stops.push(newStop); else patients[editingPatientIndex].journeys[editingJourneyIndex].stops[parseInt(indexStr)] = newStop;
+        closeModal('stop-modal'); renderStops();
+      }
+
+      // --- PATIENT PLAYER LOGIC --- //
+      function getActiveJourney(selectedPatientIndex) {
+        const now = new Date(); const currentMins = now.getHours() * 60 + now.getMinutes(); const formattedDate = now.toISOString().split('T')[0];
+        const patientJourneys = patients[selectedPatientIndex].journeys;
+        let bestMatch = null; let defaultJourney = patientJourneys.find(j => j.schedule.type === 'none') || patientJourneys[0];
+        for (let j of patientJourneys) {
+          if (j.schedule.type === 'none') continue;
+          let isDayMatch = false;
+          if (j.schedule.type === 'daily') isDayMatch = true;
+          if (j.schedule.type === 'weekly' && j.schedule.detail == now.getDay()) isDayMatch = true;
+          if (j.schedule.type === 'monthly' && j.schedule.detail == now.getDate()) isDayMatch = true;
+          if (j.schedule.type === 'yearly' && j.schedule.detail === ((now.getMonth()+1) + '-' + now.getDate())) isDayMatch = true;
+          if (j.schedule.type === 'specific' && j.schedule.detail === formattedDate) isDayMatch = true;
+          if (isDayMatch && j.schedule.time) { let parts = j.schedule.time.split(':'); let schedMins = parseInt(parts[0]) * 60 + parseInt(parts[1]); if (currentMins >= schedMins && currentMins <= (schedMins + 180)) bestMatch = j; }
+        }
+        return bestMatch || defaultJourney;
+      }
+
+      let currentActiveJourney = null, currentStopIndex = 0, panorama, panInterval;
+      let hasPlayedTrigger = false, hasTransitioned = false;
+      const TRANSITION_ANGLE = 270; 
+      const audioEl = document.getElementById("memory-audio");
+
+      function startPatientExperience() {
+        const select = document.getElementById('welcome-patient-select');
+        const selectedPatientIndex = select.value;
+        if (patients.length === 0) { alert("Please add a patient first."); return; }
+        currentActiveJourney = getActiveJourney(selectedPatientIndex);
+        if (!currentActiveJourney || currentActiveJourney.stops.length === 0) { alert(`The scheduled journey for this patient has no stops configured yet.`); return; }
+
+        const patientStage = patients[selectedPatientIndex].profile.stage;
+        let panSpeed = 0.1;
+        if (patientStage === 'advanced') panSpeed = 0.05; 
+
+        showScreen('patient-screen');
+        currentStopIndex = 0; 
+        if (!panorama) initPano(); else panorama.setPano(currentActiveJourney.stops[0].id);
+        audioEl.src = currentActiveJourney.stops[0].audio;
+        setTimeout(() => startPanning(panSpeed, patientStage), 1000); 
+      }
+      
+      function initPano() {
+        panorama = new google.maps.StreetViewPanorama(
+          document.getElementById("street-view-container"),
+          {
+            pano: currentActiveJourney.stops[0].id, pov: { heading: 0, pitch: 0 }, zoom: 1, disableDefaultUI: true, clickToGo: false, scrollwheel: false, disableDoubleClickZoom: true,
+            panoProvider: function(panoId) {
+              const stop = currentActiveJourney.stops.find(s => s.id === panoId);
+              if (stop) return { location: { pano: stop.id, description: 'Memory' }, links: [], tiles: { tileSize: new google.maps.Size(2048, 1024), worldSize: new google.maps.Size(2048, 1024), getTileUrl: () => stop.photo } };
+              return null;
+            }
+          }
+        );
+      }
+
+      function startPanning(speed, stage) {
+        clearInterval(panInterval); 
+        panInterval = setInterval(() => {
+          const currentPov = panorama.getPov();
+          let newHeading = (currentPov.heading + speed) % 360;
+          panorama.setPov({ heading: newHeading, pitch: currentPov.pitch, zoom: currentPov.zoom });
+          const currentStop = currentActiveJourney.stops[currentStopIndex];
+          const skipAudio = (stage === 'advanced');
+
+          if (!skipAudio && newHeading >= currentStop.triggerAngle && newHeading < (currentStop.triggerAngle + 0.2) && !hasPlayedTrigger) {
+            clearInterval(panInterval); hasPlayedTrigger = true;
+            if (currentStop.audio && currentStop.audio !== 'Sounds/') { audioEl.play().catch(e => { startPanning(speed, stage); }); audioEl.onended = () => { startPanning(speed, stage); }; } 
+            else { startPanning(speed, stage); }
+          }
+
+          if (newHeading >= TRANSITION_ANGLE && newHeading < (TRANSITION_ANGLE + 0.2) && !hasTransitioned) {
+            hasTransitioned = true; clearInterval(panInterval); 
+            document.getElementById('fade-overlay').style.opacity = 1;
+            setTimeout(() => {
+              currentStopIndex = (currentStopIndex + 1) % currentActiveJourney.stops.length;
+              const nextStop = currentActiveJourney.stops[currentStopIndex];
+              panorama.setPano(nextStop.id); panorama.setPov({ heading: 0, pitch: 0, zoom: 1 }); audioEl.src = nextStop.audio;
+              hasPlayedTrigger = false; hasTransitioned = false; document.getElementById('fade-overlay').style.opacity = 0; startPanning(speed, stage);
+            }, 2000); 
+          }
+        }, 50);
+      }
+
+      showScreen('welcome-screen');
+    </script>
+    
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjolAK1aDfQ6uU7JX1VIaqZXKAHQeQ05A&callback=initPano"></script>
+  </body>
+</html>
